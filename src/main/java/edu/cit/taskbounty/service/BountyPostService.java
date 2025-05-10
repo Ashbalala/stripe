@@ -59,7 +59,7 @@ public class BountyPostService {
         }
 
         // Return only public posts
-        return bountyPostRepository.findAllPublic(pageable);
+        return bountyPostRepository.findAll(pageable);
     }
 
     public Page<BountyPost> getDraftBountyPosts(int page, int size) {

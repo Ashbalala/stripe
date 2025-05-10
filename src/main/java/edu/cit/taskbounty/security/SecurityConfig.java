@@ -36,14 +36,17 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .csrf(AbstractHttpConfigurer::disable) // Disable CSRF for stateless API
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Stateless authentication
+                .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/bounty_post/**", "/solutions/**", "/stripe-account/**").authenticated() // Secure specific routes
-                        .requestMatchers("/bounty_post/{id}/donate", "/bounty_post/{id}/payment-success", "/bounty_post/{id}/donation-success").permitAll() // Allow Stripe callback
+                        // ✅ Allow POST to /bounty_post without auth
+                        .requestMatchers("/bounty_post").permitAll()
+                        // Keep other endpoints protected
+                        .requestMatchers("/bounty_post/**", "/solutions/**", "/stripe-account/**").authenticated()
+                        .requestMatchers("/bounty_post/{id}/donate", "/bounty_post/{id}/payment-success", "/bounty_post/{id}/donation-success").permitAll()
                         .anyRequest().permitAll()
                 )
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class) // Use JWT authentication
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(rateLimitingFilter, JwtAuthFilter.class)
                 .build();
     }

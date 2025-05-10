@@ -6,7 +6,6 @@ import com.stripe.model.checkout.Session;
 import com.stripe.param.checkout.SessionCreateParams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -18,9 +17,6 @@ import java.util.Map;
 public class StripeService {
 
     private static final Logger logger = LoggerFactory.getLogger(StripeService.class);
-
-    @Value("${url}")
-    private String baseUrl;
 
     public Account createExpressAccount(String email) throws StripeException {
         logger.debug("Creating Express account for email: {}", email);
@@ -50,38 +46,34 @@ public class StripeService {
                 .sum();
 
         if (availableBalance < amount && !balance.getLivemode()) {
-            try {
-                logger.warn("Insufficient balance, trying test top-up...");
+            logger.warn("Insufficient test balance, creating test charge...");
 
-                Map<String, Object> cardParams = new HashMap<>();
-                cardParams.put("type", "card");
-                cardParams.put("card[number]", "4000000000000077");
-                cardParams.put("card[exp_month]", 12);
-                cardParams.put("card[exp_year]", 2026);
-                cardParams.put("card[cvc]", "123");
-                PaymentMethod paymentMethod = PaymentMethod.create(cardParams);
+            Map<String, Object> cardParams = new HashMap<>();
+            cardParams.put("type", "card");
+            cardParams.put("card[number]", "4000000000000077");
+            cardParams.put("card[exp_month]", 12);
+            cardParams.put("card[exp_year]", 2026);
+            cardParams.put("card[cvc]", "123");
 
-                Map<String, Object> chargeParams = new HashMap<>();
-                chargeParams.put("amount", amount);
-                chargeParams.put("currency", currency);
-                chargeParams.put("payment_method", paymentMethod.getId());
-                chargeParams.put("confirm", true);
-                Charge.create(chargeParams);
+            PaymentMethod paymentMethod = PaymentMethod.create(cardParams);
 
-                balance = Balance.retrieve();
-                availableBalance = balance.getAvailable()
-                        .stream()
-                        .filter(b -> currency.equalsIgnoreCase(b.getCurrency()))
-                        .mapToLong(Balance.Available::getAmount)
-                        .sum();
+            Map<String, Object> chargeParams = new HashMap<>();
+            chargeParams.put("amount", amount);
+            chargeParams.put("currency", currency);
+            chargeParams.put("payment_method", paymentMethod.getId());
+            chargeParams.put("confirm", true);
+            Charge.create(chargeParams);
 
-                if (availableBalance < amount) {
-                    logger.error("Still insufficient balance after test charge.");
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new Transfer());
-                }
-            } catch (StripeException e) {
-                logger.error("Failed to simulate charge: {}", e.getMessage(), e);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new Transfer());
+            balance = Balance.retrieve();
+            availableBalance = balance.getAvailable()
+                    .stream()
+                    .filter(b -> currency.equalsIgnoreCase(b.getCurrency()))
+                    .mapToLong(Balance.Available::getAmount)
+                    .sum();
+
+            if (availableBalance < amount) {
+                logger.error("Still insufficient after test charge");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new Transfer());
             }
         }
 
@@ -92,12 +84,12 @@ public class StripeService {
         params.put("description", "Payment to customer");
 
         Transfer transfer = Transfer.create(params);
-        logger.info("Transfer complete: {}", transfer.getId());
+        logger.info("Transfer created with ID: {}", transfer.getId());
         return ResponseEntity.ok(transfer);
     }
 
     public Payout createPayout(String connectedAccountId, long amount, String currency, String externalAccountId) throws StripeException {
-        logger.debug("Payout to {}, external: {}", connectedAccountId, externalAccountId);
+        logger.debug("Creating payout of {} {} to account: {}, external: {}", amount, currency, connectedAccountId, externalAccountId);
         Map<String, Object> params = new HashMap<>();
         params.put("amount", amount);
         params.put("currency", currency);
@@ -107,29 +99,28 @@ public class StripeService {
         Payout payout = Payout.create(params, new com.stripe.net.RequestOptions.RequestOptionsBuilder()
                 .setStripeAccount(connectedAccountId)
                 .build());
-
-        logger.info("Payout complete: {}", payout.getId());
+        logger.info("Payout created with ID: {}", payout.getId());
         return payout;
     }
 
     public AccountLink createAccountLinkForOnboarding(String connectedAccountId, String refreshUrl, String returnUrl) throws StripeException {
-        logger.debug("Creating onboarding link for: {}", connectedAccountId);
-
+        logger.debug("Creating account link for onboarding");
         Map<String, Object> params = new HashMap<>();
         params.put("account", connectedAccountId);
         params.put("refresh_url", refreshUrl);
         params.put("return_url", returnUrl);
         params.put("type", "account_onboarding");
 
-        AccountLink accountLink = AccountLink.create(params);
-        logger.info("Onboarding URL: {}", accountLink.getUrl());
-        return accountLink;
+        AccountLink link = AccountLink.create(params);
+        logger.info("Account link created: {}", link.getUrl());
+        return link;
     }
 
     public String createCheckoutSession(String bountyPostId, long amount, String currency, String successUrl, String cancelUrl, String itemName) throws StripeException {
-        logger.debug("Creating Stripe checkout for bountyPostId: {}", bountyPostId);
+        logger.debug("Creating checkout session for bountyPostId: {}", bountyPostId);
 
-        String redirectSuccessUrl = baseUrl + "/payment_success.html?session_id={CHECKOUT_SESSION_ID}";
+        // Local testing redirect page (contains redirect to bountymobile://payment_success)
+        String redirectSuccessUrl = "https://taskbounty-434679566601.us-west2.run.app/";
 
         SessionCreateParams params = SessionCreateParams.builder()
                 .setMode(SessionCreateParams.Mode.PAYMENT)
@@ -155,7 +146,7 @@ public class StripeService {
                 .build();
 
         Session session = Session.create(params);
-        logger.info("Stripe session URL: {}", session.getUrl());
+        logger.info("Checkout session created, URL: {}", session.getUrl());
         return session.getUrl();
     }
 }

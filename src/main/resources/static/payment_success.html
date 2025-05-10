@@ -1,25 +1,15 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <title>Redirecting to Task Bounty...</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            font-family: sans-serif;
-        }
-    </style>
+    <title>Payment Success</title>
+    <script>
+        // Redirect back to the app using deep link
+        window.onload = function () {
+            window.location.href = "bountymobile://payment_success";
+        };
+    </script>
 </head>
 <body>
-<p>Redirecting to Task Bounty App...</p>
-<script>
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionId = urlParams.get('session_id');
-    // Replace "bountymobile" with your app's scheme if different
-    window.location.href = `bountymobile://payment_success?session_id=${sessionId}`;
-</script>
+<h2>Redirecting back to app...</h2>
 </body>
 </html>
